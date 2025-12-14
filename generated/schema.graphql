@@ -476,7 +476,7 @@ input morTransferFilter {
   blockNumber_in: [BigInt]
   blockNumber_not_in: [BigInt]
   blockNumber_gt: BigInt
-  blockNumber_lt: BigInt 
+  blockNumber_lt: BigInt
   blockNumber_gte: BigInt
   blockNumber_lte: BigInt
   blockTimestamp: Int

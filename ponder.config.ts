@@ -1,9 +1,9 @@
-import { createConfig, factory } from "ponder";
-import { parseAbiItem, http, type Abi } from "viem";
+import { createConfig } from "ponder";
+import { http, type Abi } from "viem";
 import { loadBalance, rateLimit } from "ponder";
 
 // Import ABIs from local files
-import { BuildersAbi, ERC20Abi, L2FactoryAbi, SubnetFactoryAbi } from "./abis/index.js";
+import { BuildersAbi, FeeConfigAbi, ERC20Abi } from "./abis/index.js";
 
 // Detect production environment
 const isProduction = 
@@ -46,68 +46,54 @@ export default createConfig({
           kind: "postgres",
           connectionString: databaseUrl,
           poolConfig: {
-            max: 30,
+            max: 10, // Reduced from 30 to avoid overwhelming Railway Hobby plan
           },
         },
       }
     : {}),
   chains: {
-    arbitrum: {
+    arbitrumOne: {
       id: 42161,
       rpc: loadBalance([
-        http(process.env.PONDER_RPC_URL_42161!),
-        rateLimit(http("https://arbitrum-one.public.blastapi.io"), { 
-          requestsPerSecond: 25 
-        }),
+        http(process.env.PONDER_RPC_URL_42161 || "https://arb1.arbitrum.io/rpc"),
         rateLimit(http("https://arbitrum-one-rpc.publicnode.com"), { 
-          requestsPerSecond: 10 
+          requestsPerSecond: 25 
         }),
       ]),
     },
   },
   contracts: {
-    // Main Builders staking contract - Arbitrum mainnet
+    // Main Builders staking contract - Arbitrum One
     Builders: {
       abi: BuildersAbi as Abi,
-      chain: "arbitrum",
+      chain: "arbitrumOne",
       address: (process.env.BUILDERS_CONTRACT_ADDRESS || "0xC0eD68f163d44B6e9985F0041fDf6f67c6BCFF3f") as `0x${string}`,
-      startBlock: Number(process.env.BUILDERS_START_BLOCK || "18000000"),
+      startBlock: Number(process.env.BUILDERS_START_BLOCK || "286160080"),
       includeTransactionReceipts: true,
     },
 
     // MOR Token contract - for tracking transfers and approvals
     MorToken: {
       abi: ERC20Abi as Abi,
-      chain: "arbitrum",
-      address: (process.env.MOR_TOKEN_ADDRESS || "0x092bAaDB7DEf4C3981454dD9c0A0D7FF07bCFc86") as `0x${string}`,
-      startBlock: Number(process.env.MOR_TOKEN_START_BLOCK || "17500000"),
+      chain: "arbitrumOne",
+      address: (process.env.MOR_TOKEN_ADDRESS || "0x7431ADA8A591C955A994A21710752ef9b882b8e3") as `0x${string}`,
+      startBlock: Number(process.env.MOR_TOKEN_START_BLOCK || "286160080"),
     },
 
-    // L2 Factory - Arbitrum only, creates builder subnets
-    L2Factory: {
-      abi: L2FactoryAbi as Abi,
-      chain: "arbitrum",
-      address: (process.env.L2_FACTORY_ADDRESS || "0x890bfa255e6ee8db5c67ab32dc600b14ebc4546c") as `0x${string}`,
-      startBlock: Number(process.env.L2_FACTORY_START_BLOCK || "18000000"),
+    // BuildersTreasury contract - Arbitrum One
+    BuildersTreasury: {
+      abi: BuildersAbi as Abi, // Using Builders ABI - update if treasury has different ABI
+      chain: "arbitrumOne",
+      address: (process.env.BUILDERS_TREASURY_ADDRESS || "0xCBE3d2c3AdE62cf7aa396e8cA93D2A8bff96E257") as `0x${string}`,
+      startBlock: Number(process.env.BUILDERS_TREASURY_START_BLOCK || "286160108"),
     },
 
-    // Subnet Factory - Arbitrum only, creates subnet instances
-    SubnetFactory: {
-      abi: SubnetFactoryAbi as Abi,
-      chain: "arbitrum",
-      address: (process.env.SUBNET_FACTORY_ADDRESS || "0x37b94bd80b6012fb214bb6790b31a5c40d6eb7a5") as `0x${string}`,
-      startBlock: Number(process.env.SUBNET_FACTORY_START_BLOCK || "18000000"),
-    },
-
-    // Dynamic contracts created by L2Factory
-    DynamicSubnet: {
-      abi: BuildersAbi as Abi, // Assuming subnets use similar interface
-      chain: "arbitrum",
-      address: factory({
-        address: (process.env.L2_FACTORY_ADDRESS || "0x890bfa255e6ee8db5c67ab32dc600b14ebc4546c") as `0x${string}`,
-        event: parseAbiItem("event SubnetCreated(address indexed subnet, address indexed creator, bytes32 salt)"),
-        parameter: "subnet",
-      }),
+    // FeeConfig contract - Arbitrum One
+    FeeConfig: {
+      abi: FeeConfigAbi as Abi,
+      chain: "arbitrumOne",
+      address: (process.env.FEE_CONFIG_ADDRESS || "0xc03d87085E254695754a74D2CF76579e167Eb895") as `0x${string}`,
+      startBlock: Number(process.env.FEE_CONFIG_START_BLOCK || "286160130"),
     },
   },
 });

@@ -14,8 +14,8 @@ const createUserId = (projectId: string, userAddress: string) =>
   `${projectId}-${userAddress.toLowerCase()}`;
 
 // Helper function to get or create counters
-const getOrCreateCounters = async (context: any) => {
-  let counter = await context.db
+const getOrCreateCounters = async (context: any, blockTimestamp: number) => {
+  let counter = await context.db.sql
     .select()
     .from(counters)
     .where(eq(counters.id, "global"))
@@ -24,14 +24,14 @@ const getOrCreateCounters = async (context: any) => {
   if (counter.length === 0) {
     await context.db.insert(counters).values({
       id: "global",
-      totalBuildersProjects: 0,
-      totalSubnets: 0,
+      totalBuildersProjects: 0n, // Changed to BigInt to match expected schema
+      totalSubnets: 0n, // Changed to BigInt to match expected schema
       totalStaked: 0n,
       totalUsers: 0,
-      lastUpdated: Number(context.block.timestamp),
+      lastUpdated: blockTimestamp,
     });
     
-    counter = await context.db
+    counter = await context.db.sql
       .select()
       .from(counters)
       .where(eq(counters.id, "global"))
@@ -63,7 +63,7 @@ ponder.on("Builders:BuilderPoolCreated", async ({ event, context }: any) => {
     name: name,
     admin: admin,
     totalStaked: 0n,
-    totalUsers: 0,
+    totalUsers: 0n, // Changed to BigInt to match expected schema
     totalClaimed: 0n,
     minimalDeposit: minimalDeposit,
     withdrawLockPeriodAfterDeposit: BigInt(withdrawLockPeriodAfterDeposit),
@@ -71,17 +71,17 @@ ponder.on("Builders:BuilderPoolCreated", async ({ event, context }: any) => {
     startsAt: BigInt(poolStart),
     chainId: context.chain.id,
     contractAddress: event.log.address,
-    createdAt: Number(context.block.timestamp),
+    createdAt: Number(event.block.timestamp),
     createdAtBlock: event.block.number,
   });
 
   // Update counters
-  const counter = await getOrCreateCounters(context);
-  await context.db
+  const counter = await getOrCreateCounters(context, Number(event.block.timestamp));
+  await context.db.sql
     .update(counters)
     .set({
-      totalBuildersProjects: counter.totalBuildersProjects + 1,
-      lastUpdated: Number(context.block.timestamp),
+      totalBuildersProjects: BigInt(counter.totalBuildersProjects) + 1n, // Changed to BigInt to match expected schema
+      lastUpdated: Number(event.block.timestamp),
     })
     .where(eq(counters.id, "global"));
 });
@@ -100,7 +100,7 @@ ponder.on("Builders:UserDeposited", async ({ event, context }: any) => {
     eventType: "DEPOSIT",
     amount: amount,
     blockNumber: event.block.number,
-    blockTimestamp: Number(context.block.timestamp),
+    blockTimestamp: Number(event.block.timestamp),
     transactionHash: event.transaction.hash,
     logIndex: event.log.logIndex,
     chainId: context.chain.id,
@@ -125,7 +125,7 @@ ponder.on("Builders:UserDeposited", async ({ event, context }: any) => {
       address: user,
       staked: deposited,
       claimed: 0n, // Will be updated on claim events
-      lastStake: BigInt(context.block.timestamp),
+      lastStake: BigInt(event.block.timestamp),
       claimLockEnd: claimLockStart,
       lastDeposit: lastDeposit,
       virtualDeposited: virtualDeposited,
@@ -133,28 +133,28 @@ ponder.on("Builders:UserDeposited", async ({ event, context }: any) => {
     })
     .onConflictDoUpdate({
       staked: deposited,
-      lastStake: BigInt(context.block.timestamp),
+      lastStake: BigInt(event.block.timestamp),
       claimLockEnd: claimLockStart,
       lastDeposit: lastDeposit,
       virtualDeposited: virtualDeposited,
     });
 
   // Update project totals
-  const existingUsers = await context.db
+  const existingUsers = await context.db.sql
     .select({ count: sql`count(*)` })
     .from(buildersUser)
     .where(eq(buildersUser.buildersProjectId, builderPoolId));
 
-  const totalStaked = await context.db
+  const totalStaked = await context.db.sql
     .select({ sum: sql`sum(${buildersUser.staked})` })
     .from(buildersUser)
     .where(eq(buildersUser.buildersProjectId, builderPoolId));
 
-  await context.db
+  await context.db.sql
     .update(buildersProject)
     .set({
       totalStaked: totalStaked[0].sum || 0n,
-      totalUsers: existingUsers[0].count,
+      totalUsers: BigInt(existingUsers[0].count), // Changed to BigInt to match expected schema
     })
     .where(eq(buildersProject.id, builderPoolId));
 });
@@ -173,7 +173,7 @@ ponder.on("Builders:UserWithdrawn", async ({ event, context }: any) => {
     eventType: "WITHDRAW",
     amount: amount,
     blockNumber: event.block.number,
-    blockTimestamp: Number(context.block.timestamp),
+    blockTimestamp: Number(event.block.timestamp),
     transactionHash: event.transaction.hash,
     logIndex: event.log.logIndex,
     chainId: context.chain.id,
@@ -190,7 +190,7 @@ ponder.on("Builders:UserWithdrawn", async ({ event, context }: any) => {
   const [lastDeposit, claimLockStart, deposited, virtualDeposited] = userData;
 
   // Update user record
-  await context.db
+  await context.db.sql
     .update(buildersUser)
     .set({
       staked: deposited,
@@ -200,12 +200,12 @@ ponder.on("Builders:UserWithdrawn", async ({ event, context }: any) => {
     .where(eq(buildersUser.id, userId));
 
   // Update project totals
-  const totalStaked = await context.db
+  const totalStaked = await context.db.sql
     .select({ sum: sql`sum(${buildersUser.staked})` })
     .from(buildersUser)
     .where(eq(buildersUser.buildersProjectId, builderPoolId));
 
-  await context.db
+  await context.db.sql
     .update(buildersProject)
     .set({
       totalStaked: totalStaked[0].sum || 0n,
@@ -222,7 +222,7 @@ ponder.on("MorToken:Transfer", async ({ event, context }: any) => {
   const { from, to, value } = event.args;
   
   // Check if this transfer is related to builders staking
-  // Base mainnet Builders contract address only
+  // Arbitrum One Builders contract address
   const buildersAddress = "0xC0eD68f163d44B6e9985F0041fDf6f67c6BCFF3f" as `0x${string}`;
   
   const isStakingRelated = 
@@ -244,7 +244,7 @@ ponder.on("MorToken:Transfer", async ({ event, context }: any) => {
     to: to,
     value: value,
     blockNumber: event.block.number,
-    blockTimestamp: Number(context.block.timestamp),
+    blockTimestamp: Number(event.block.timestamp),
     transactionHash: event.transaction.hash,
     logIndex: event.log.logIndex,
     chainId: context.chain.id,

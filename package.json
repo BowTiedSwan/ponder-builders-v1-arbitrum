@@ -1,5 +1,5 @@
 {
-  "name": "@morpheusai/ponder-builders-v1-arbitrum",
+  "name": "@morpheusai/ponder-builders-v1-base",
   "version": "0.0.1",
   "private": true,
   "type": "module",

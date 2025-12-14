@@ -2,9 +2,9 @@
 import BuildersJson from "./Builders.json";
 export const BuildersAbi = BuildersJson;
 
+// Import FeeConfig ABI from JSON file
+import FeeConfigJson from "./FeeConfig.json";
+export const FeeConfigAbi = FeeConfigJson;
+
 // Export ERC20 ABI
 export { ERC20Abi } from "./ERC20.js";
-
-// Export Factory ABIs
-export { L2FactoryAbi } from "./L2Factory.js";
-export { SubnetFactoryAbi } from "./SubnetFactory.js";

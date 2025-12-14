@@ -1,4 +1,4 @@
 [deploy]
-startCommand = "npm start -- --schema ${RAILWAY_DEPLOYMENT_ID:-builders_v1_arbitrum_prod} --views-schema builders_v1_arbitrum"
-healthcheckPath = "/health"
+startCommand = "npm start -- --schema ${RAILWAY_DEPLOYMENT_ID:-builders_v1_base_prod} --views-schema builders_v1_base"
+healthcheckPath = "/healthz"
 healthcheckTimeout = 300
